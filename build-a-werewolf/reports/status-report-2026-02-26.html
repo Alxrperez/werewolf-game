@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Build-a-Werewolf — MVP Status Report</title>
+  <style>
+    :root{
+      --bg:#0b1020; --card:#121a31; --muted:#98a3c7; --text:#eef3ff;
+      --accent:#6ea8fe; --accent2:#7ef0c2; --warn:#ffd166;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(120deg,#0b1020,#131b35 60%,#101a2f);color:var(--text)}
+    .wrap{max-width:980px;margin:0 auto;padding:42px 36px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:24px}
+    .title{font-size:34px;font-weight:800;line-height:1.1;margin:0}
+    .subtitle{margin-top:8px;color:var(--muted);font-size:14px}
+    .badge{padding:8px 12px;border:1px solid #32406a;border-radius:999px;color:#b8c7f5;font-size:12px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:22px 0}
+    .card{background:rgba(18,26,49,.8);border:1px solid #2a365d;border-radius:14px;padding:14px 14px 12px}
+    .k{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .v{font-size:28px;font-weight:800;margin-top:6px}
+    h2{margin:26px 0 10px;font-size:18px}
+    .panel{background:rgba(18,26,49,.75);border:1px solid #2a365d;border-radius:14px;padding:14px}
+    .row{margin:10px 0}
+    .label{font-size:13px;color:#c8d4fb;margin-bottom:6px}
+    .bar{height:10px;background:#1d2747;border-radius:999px;overflow:hidden}
+    .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));}
+    ul{margin:8px 0 0 18px}
+    li{margin:6px 0;color:#dbe5ff}
+    .muted{color:var(--muted)}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .footer{margin-top:24px;font-size:12px;color:var(--muted)}
+    .pill{display:inline-block;padding:4px 8px;border-radius:8px;background:#1b2647;color:#cfe0ff;font-size:11px;margin-right:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <h1 class="title">Build-a-Werewolf<br/>MVP Progress Report</h1>
+        <div class="subtitle">Prepared for Alexander Perez • 2026-02-26 (EST)</div>
+      </div>
+      <div class="badge">Status: In Progress</div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><div class="k">Overall Completion</div><div class="v">24%</div></div>
+      <div class="card"><div class="k">Current Phase</div><div class="v" style="font-size:20px">Core App Wiring</div></div>
+      <div class="card"><div class="k">MVP ETA</div><div class="v" style="font-size:20px">~6–9 working days</div></div>
+    </div>
+
+    <h2>Progress Breakdown</h2>
+    <div class="panel">
+      <div class="row"><div class="label">Project scaffold (Next.js + TS + Firebase wiring)</div><div class="bar"><div class="fill" style="width:100%"></div></div></div>
+      <div class="row"><div class="label">Meet add-on integration (side panel + main stage runtime context)</div><div class="bar"><div class="fill" style="width:20%"></div></div></div>
+      <div class="row"><div class="label">Firestore data layer + required schema helpers</div><div class="bar"><div class="fill" style="width:25%"></div></div></div>
+      <div class="row"><div class="label">Lobby + host controls</div><div class="bar"><div class="fill" style="width:15%"></div></div></div>
+      <div class="row"><div class="label">Roles, secrecy enforcement, wolves-only features</div><div class="bar"><div class="fill" style="width:10%"></div></div></div>
+      <div class="row"><div class="label">Night/day/vote/resolve loop + win logic</div><div class="bar"><div class="fill" style="width:8%"></div></div></div>
+      <div class="row"><div class="label">Theme editor + Firebase Storage uploads + live updates</div><div class="bar"><div class="fill" style="width:5%"></div></div></div>
+      <div class="row"><div class="label">Tests + docs + private deployment guide</div><div class="bar"><div class="fill" style="width:18%"></div></div></div>
+    </div>
+
+    <div class="two">
+      <div class="panel">
+        <h2 style="margin-top:0">Completed So Far</h2>
+        <ul>
+          <li>Repository initialized and pushed to GitHub</li>
+          <li>Next.js TypeScript structure created</li>
+          <li>Side panel and main stage route scaffolds in place</li>
+          <li>Firebase client initialization configured</li>
+          <li>Initial Firestore rules scaffold added</li>
+          <li>Game engine module started + first unit test</li>
+          <li>Status tracking doc and GitHub Wiki updated</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h2 style="margin-top:0">Next Work (In Order)</h2>
+        <ul>
+          <li><b>Chunk 2:</b> Meet context binding + full Firestore typed helpers</li>
+          <li>Lobby synchronization + ready flow + host controls</li>
+          <li>Role assignment + private role card enforcement</li>
+          <li>Night actions + resolveNight + day timer + vote flow</li>
+          <li>Win-condition loop and reset game safety flow</li>
+          <li>Theme editor + image upload + lock-during-game</li>
+          <li>Rules hardening + unit test expansion + README finalization</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Estimated Completion by Area</h2>
+    <div class="panel">
+      <p><span class="pill">High Confidence</span>Scaffold, core game engine functions, base UI delivery.</p>
+      <p><span class="pill">Medium Confidence</span>Meet add-on packaging + private deployment setup (depends on GCP/Marketplace config steps).</p>
+      <p><span class="pill">Medium Confidence</span>Strict Firestore secrecy rules validation across all edge cases.</p>
+      <p class="muted">Estimate assumes no major SDK or Marketplace policy blockers and timely access to test accounts.</p>
+    </div>
+
+    <div class="footer">
+      This report reflects current tracked implementation status in the repository and active plan milestones.
+    </div>
+  </div>
+</body>
+</html>
