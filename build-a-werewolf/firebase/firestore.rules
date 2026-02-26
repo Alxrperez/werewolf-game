@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function gameDoc(gameId) { return get(/databases/$(database)/documents/games/$(gameId)); }
+    function isHost(gameId) { return signedIn() && request.auth.uid == gameDoc(gameId).data.hostUid; }
+    function playerDoc(gameId, uid) { return get(/databases/$(database)/documents/games/$(gameId)/players/$(uid)); }
+    function isPlayer(gameId) { return signedIn() && exists(/databases/$(database)/documents/games/$(gameId)/players/$(request.auth.uid)); }
+    function isAlive(gameId) { return isPlayer(gameId) && playerDoc(gameId, request.auth.uid).data.alive == true; }
+    function myRole(gameId) { return playerDoc(gameId, request.auth.uid).data.role; }
+    function isWolf(gameId) { return isPlayer(gameId) && myRole(gameId) == 'werewolf'; }
+
+    match /meetings/{meetingId} {
+      allow read, write: if signedIn();
+    }
+
+    match /games/{gameId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if isHost(gameId);
+
+      match /players/{uid} {
+        allow read: if signedIn() && (
+          request.auth.uid == uid ||
+          !('role' in resource.data) ||
+          !('team' in resource.data)
+        );
+        allow create: if signedIn() && request.auth.uid == uid;
+        allow update: if (signedIn() && request.auth.uid == uid) || isHost(gameId);
+      }
+
+      match /actions/{actionId} {
+        allow read: if isPlayer(gameId);
+        allow create: if isPlayer(gameId) && isAlive(gameId);
+      }
+
+      match /state/{docId} {
+        allow read: if isPlayer(gameId);
+        allow write: if isHost(gameId);
+      }
+
+      match /wolvesChat/{messageId} {
+        allow read, write: if isWolf(gameId) && isAlive(gameId);
+      }
+    }
+
+    match /themes/{themeId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+    }
+  }
+}
