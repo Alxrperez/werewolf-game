@@ -20,5 +20,3 @@
 - Disk:
 - Runtime notes:
 
-## PM Sync
-- Notion sync: pending
