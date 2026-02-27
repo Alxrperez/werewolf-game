@@ -1,2 +1,4 @@
-build-a-werewolf/.env.local
-*.env.local
+node_modules/
+.next/
+.env.local
+tsconfig.tsbuildinfo
