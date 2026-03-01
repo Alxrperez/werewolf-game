@@ -4,17 +4,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { onSnapshot } from 'firebase/firestore';
 import { auth, db } from '@/src/lib/firebase';
+import { getMeetRuntimeContext } from '@/src/lib/meetContext';
 import {
   createLobby,
   getLobby,
   joinLobby,
   lobbyRef,
   playerRef,
+  playersColRef,
   revealRoleCard,
   roleCardRef,
-  setReady
+  setReady,
+  submitDayVote,
+  submitNightAction
 } from '@/src/lib/firestoreHelpers';
-import type { Lobby, LobbyPlayer, RoleCard } from '@/src/lib/firestoreSchema';
+import {
+  parseLobbyPlayer,
+  type Lobby,
+  type LobbyPlayer,
+  type RoleCard
+} from '@/src/lib/firestoreSchema';
 
 export default function SidePanelPage() {
   const [user, setUser] = useState<User | null>(auth.currentUser);
@@ -23,11 +32,21 @@ export default function SidePanelPage() {
   const [activeLobbyId, setActiveLobbyId] = useState('');
   const [activeLobby, setActiveLobby] = useState<Lobby | null>(null);
   const [me, setMe] = useState<LobbyPlayer | null>(null);
+  const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [roleCard, setRoleCard] = useState<RoleCard | null>(null);
+  const [actionTargetUid, setActionTargetUid] = useState('');
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
+
+  useEffect(() => {
+    getMeetRuntimeContext().then((ctx) => {
+      if (ctx.meetingId) setLobbyInput(ctx.meetingId.toUpperCase());
+      if (ctx.displayName) setName((prev) => prev || ctx.displayName || '');
+    });
+  }, []);
 
   const normalizedLobbyId = useMemo(() => lobbyInput.trim().toUpperCase(), [lobbyInput]);
   const canSubmitLobby = useMemo(() => Boolean(name.trim() && normalizedLobbyId), [name, normalizedLobbyId]);
@@ -52,6 +71,10 @@ export default function SidePanelPage() {
       setMe(snap.data() as LobbyPlayer);
     });
 
+    const unsubPlayers = onSnapshot(playersColRef(db, activeLobbyId), (snaps) => {
+      setPlayers(snaps.docs.map((d) => parseLobbyPlayer(d.data())));
+    });
+
     const unsubRole = onSnapshot(roleCardRef(db, activeLobbyId, user.uid), (snap) => {
       if (!snap.exists()) {
         setRoleCard(null);
@@ -63,6 +86,7 @@ export default function SidePanelPage() {
     return () => {
       unsubLobby();
       unsubMe();
+      unsubPlayers();
       unsubRole();
     };
   }, [activeLobbyId, user]);
@@ -75,6 +99,7 @@ export default function SidePanelPage() {
 
   async function onCreateLobby() {
     setError(null);
+    setStatus('');
     setBusy(true);
     try {
       await ensureSignedIn();
@@ -93,6 +118,7 @@ export default function SidePanelPage() {
 
   async function onJoinLobby() {
     setError(null);
+    setStatus('');
     setBusy(true);
     try {
       await ensureSignedIn();
@@ -128,6 +154,41 @@ export default function SidePanelPage() {
     }
   }
 
+  async function onNightAction() {
+    if (!user || !activeLobbyId || !activeLobby || !roleCard || !actionTargetUid) return;
+    setError(null);
+    setStatus('');
+    try {
+      const actionType =
+        roleCard.role === 'werewolf'
+          ? 'wolfKill'
+          : roleCard.role === 'doctor'
+            ? 'doctorSave'
+            : roleCard.role === 'seer'
+              ? 'seerCheck'
+              : null;
+      if (!actionType) throw new Error('Villagers do not submit night actions.');
+      await submitNightAction(db, activeLobbyId, user.uid, actionType, actionTargetUid, activeLobby.dayNumber);
+      setStatus('Night action submitted.');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function onVote() {
+    if (!user || !activeLobbyId || !activeLobby || !actionTargetUid) return;
+    setError(null);
+    setStatus('');
+    try {
+      await submitDayVote(db, activeLobbyId, user.uid, actionTargetUid, activeLobby.dayNumber);
+      setStatus('Vote submitted.');
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  const aliveTargets = players.filter((p) => p.alive && p.uid !== user?.uid);
+
   return (
     <main style={{ padding: 16, fontFamily: 'sans-serif', display: 'grid', gap: 14 }}>
       <h1 style={{ margin: 0 }}>Build-a-Werewolf (Side Panel)</h1>
@@ -156,11 +217,12 @@ export default function SidePanelPage() {
           <>
             <p style={{ margin: '6px 0' }}>Lobby: <strong>{activeLobbyId}</strong></p>
             <p style={{ margin: '6px 0' }}>Phase: <strong>{activeLobby?.phase ?? 'loading...'}</strong></p>
+            <p style={{ margin: '6px 0' }}>Day: <strong>{activeLobby?.dayNumber ?? '-'}</strong></p>
             <p style={{ margin: '6px 0' }}>
               You: <strong>{me?.displayName || name || 'loading...'}</strong>{' '}
-              {isHost ? '(Host)' : '(Player)'}
+              {isHost ? '(Host)' : '(Player)'} — {me?.alive ? '🫀 Alive' : '💀 Eliminated'}
             </p>
-            <button disabled={!me} onClick={onToggleReady}>{me?.isReady ? 'Set Not Ready' : 'Set Ready'}</button>
+            <button disabled={!me || activeLobby?.phase !== 'lobby'} onClick={onToggleReady}>{me?.isReady ? 'Set Not Ready' : 'Set Ready'}</button>
           </>
         )}
       </section>
@@ -175,10 +237,42 @@ export default function SidePanelPage() {
             {roleCard.viewedAt ? `(revealed at ${new Date(roleCard.viewedAt).toLocaleTimeString()})` : ''}
           </p>
         ) : (
-          <p>No role assigned yet (host will deal cards from the main stage).</p>
+          <p>No role assigned yet (host will start game from the main stage).</p>
         )}
       </section>
 
+      <section style={{ border: '1px solid #ddd', borderRadius: 8, padding: 12 }}>
+        <h2 style={{ marginTop: 0 }}>4) Actions</h2>
+        <label>
+          Target:
+          <select value={actionTargetUid} onChange={(e) => setActionTargetUid(e.target.value)} style={{ marginLeft: 8 }}>
+            <option value="">Select player</option>
+            {aliveTargets.map((p) => (
+              <option key={p.uid} value={p.uid}>{p.displayName}</option>
+            ))}
+          </select>
+        </label>
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          <button
+            disabled={!me?.alive || !roleCard || !actionTargetUid || activeLobby?.phase !== 'night'}
+            onClick={onNightAction}
+          >
+            Submit Night Action
+          </button>
+          <button
+            disabled={!me?.alive || !actionTargetUid || activeLobby?.phase !== 'day'}
+            onClick={onVote}
+          >
+            Submit Day Vote
+          </button>
+        </div>
+
+        {activeLobby?.phase === 'night' && roleCard?.role === 'villager' ? <p>Villagers sleep at night; no action needed.</p> : null}
+        {activeLobby?.winner ? <p>Game ended. Winner: <strong>{activeLobby.winner}</strong></p> : null}
+      </section>
+
+      {status ? <p style={{ color: 'green', margin: 0 }}>{status}</p> : null}
       {error ? <p style={{ color: 'crimson', margin: 0 }}>{error}</p> : null}
     </main>
   );
