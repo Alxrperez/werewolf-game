@@ -2,45 +2,62 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function gameDoc(gameId) { return get(/databases/$(database)/documents/games/$(gameId)); }
-    function isHost(gameId) { return signedIn() && request.auth.uid == gameDoc(gameId).data.hostUid; }
-    function playerDoc(gameId, uid) { return get(/databases/$(database)/documents/games/$(gameId)/players/$(uid)); }
-    function isPlayer(gameId) { return signedIn() && exists(/databases/$(database)/documents/games/$(gameId)/players/$(request.auth.uid)); }
-    function isAlive(gameId) { return isPlayer(gameId) && playerDoc(gameId, request.auth.uid).data.alive == true; }
-    function myRole(gameId) { return playerDoc(gameId, request.auth.uid).data.role; }
-    function isWolf(gameId) { return isPlayer(gameId) && myRole(gameId) == 'werewolf'; }
+    function lobbyDoc(lobbyId) { return get(/databases/$(database)/documents/lobbies/$(lobbyId)); }
+    function playerDoc(lobbyId, uid) { return get(/databases/$(database)/documents/lobbies/$(lobbyId)/players/$(uid)); }
+    function isHost(lobbyId) { return signedIn() && request.auth.uid == lobbyDoc(lobbyId).data.hostUid; }
+    function isPlayer(lobbyId) {
+      return signedIn() && exists(/databases/$(database)/documents/lobbies/$(lobbyId)/players/$(request.auth.uid));
+    }
+    function isSelf(uid) { return signedIn() && request.auth.uid == uid; }
+    function lobbyPhase(lobbyId) { return lobbyDoc(lobbyId).data.phase; }
 
     match /meetings/{meetingId} {
       allow read, write: if signedIn();
     }
 
-    match /games/{gameId} {
-      allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if isHost(gameId);
+    match /lobbies/{lobbyId} {
+      allow read: if isPlayer(lobbyId);
+      allow create: if signedIn() && request.resource.data.hostUid == request.auth.uid;
+      allow update: if isHost(lobbyId);
 
       match /players/{uid} {
-        allow read: if signedIn() && (
-          request.auth.uid == uid ||
-          !('role' in resource.data) ||
-          !('team' in resource.data)
-        );
-        allow create: if signedIn() && request.auth.uid == uid;
-        allow update: if (signedIn() && request.auth.uid == uid) || isHost(gameId);
+        allow read: if isPlayer(lobbyId);
+        allow create: if isSelf(uid);
+        allow update: if isHost(lobbyId)
+          || (isSelf(uid)
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.displayName == resource.data.displayName
+            && request.resource.data.isHost == resource.data.isHost
+            && request.resource.data.joinedAt == resource.data.joinedAt
+            && request.resource.data.alive == resource.data.alive);
       }
 
-      match /actions/{actionId} {
-        allow read: if isPlayer(gameId);
-        allow create: if isPlayer(gameId) && isAlive(gameId);
+      match /roleCards/{uid} {
+        allow create: if isHost(lobbyId);
+        allow read: if isHost(lobbyId) || isSelf(uid);
+        allow update: if isHost(lobbyId)
+          || (isSelf(uid)
+            && request.resource.data.uid == resource.data.uid
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.assignedAt == resource.data.assignedAt);
       }
 
-      match /state/{docId} {
-        allow read: if isPlayer(gameId);
-        allow write: if isHost(gameId);
+      match /nightActions/{uid} {
+        allow read: if isHost(lobbyId) || isSelf(uid);
+        allow create, update: if isSelf(uid)
+          && isPlayer(lobbyId)
+          && playerDoc(lobbyId, uid).data.alive == true
+          && lobbyPhase(lobbyId) == 'night';
+        allow delete: if isHost(lobbyId);
       }
 
-      match /wolvesChat/{messageId} {
-        allow read, write: if isWolf(gameId) && isAlive(gameId);
+      match /dayVotes/{uid} {
+        allow read: if isHost(lobbyId) || isSelf(uid);
+        allow create, update: if isSelf(uid)
+          && isPlayer(lobbyId)
+          && playerDoc(lobbyId, uid).data.alive == true
+          && lobbyPhase(lobbyId) == 'day';
+        allow delete: if isHost(lobbyId);
       }
     }
 
